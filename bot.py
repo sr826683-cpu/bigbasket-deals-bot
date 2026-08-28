@@ -1,25 +1,43 @@
 import os
-import time
-import logging
+import json
 import requests
 
-# Telegram settings
-BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-CHANNEL_ID = os.getenv("TELEGRAM_CHANNEL_ID", "@BIGBASKETDEALSINDIA")
+PARSE_API_KEY = os.environ["PARSE_API_KEY"]
+TELEGRAM_BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
+CHANNEL_ID = os.environ.get("TELEGRAM_CHANNEL_ID", "@BIGBASKETDEALSINDIA")
 
-# Monitoring settings
-CHECK_INTERVAL = 300  # 5 minutes
+API_BASE = "https://api.parse.bot/scraper/1d9ca2c5-176c-4bc0-9cf3-db9056850958"
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s"
-)
+PRODUCT_SLUG = "zeeba-everyday-super-mongra-basmati-rice-pure-authentic-delicious-taste-unique-aroma-5-kg"
+
+STATE_FILE = "price_state.json"
+
+
+def get_product():
+    url = f"{API_BASE}/search_products"
+
+    params = {
+        "page": 1,
+        "query": "Zeeba Everyday Super Mongra Basmati Rice 5 kg"
+    }
+
+    headers = {
+        "X-API-Key": PARSE_API_KEY
+    }
+
+    response = requests.get(
+        url,
+        params=params,
+        headers=headers,
+        timeout=30
+    )
+
+    response.raise_for_status()
+    return response.json()
+
 
 def send_telegram(message):
-    if not BOT_TOKEN:
-        raise RuntimeError("TELEGRAM_BOT_TOKEN is not configured")
-
-    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
 
     response = requests.post(
         url,
@@ -32,31 +50,29 @@ def send_telegram(message):
     )
 
     response.raise_for_status()
-    return response.json()
 
 
-def check_bigbasket():
-    """
-    BigBasket price-data source will be connected here.
+def load_state():
+    if not os.path.exists(STATE_FILE):
+        return None
 
-    Do not scrape BigBasket directly.
-    Add an authorized API/feed here when available.
-    """
-    logging.info("Checking BigBasket data source...")
+    with open(STATE_FILE, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def save_state(data):
+    with open(STATE_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2)
 
 
 def main():
-    logging.info("BigBasket Deals Bot started")
-    logging.info("Location: Gurgaon, Haryana - 122505")
-    logging.info("Channel: %s", CHANNEL_ID)
+    data = get_product()
 
-    while True:
-        try:
-            check_bigbasket()
-        except Exception as e:
-            logging.error("Monitor error: %s", e)
+    print("BigBasket API response received.")
+    print(json.dumps(data, indent=2)[:5000])
 
-        time.sleep(CHECK_INTERVAL)
+    # Product matching and price extraction will be finalized
+    # after confirming the exact API response structure.
 
 
 if __name__ == "__main__":
